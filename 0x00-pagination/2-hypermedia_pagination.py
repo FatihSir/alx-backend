@@ -4,12 +4,13 @@ Task 1: Simple pagination with a server class for managing baby names data.
 """
 
 import csv
-from typing import List, Tuple
+from typing import List, Tuple, Dict
+import math
 
 
 def index_range(page: int, page_size: int) -> Tuple[int, int]:
     """
-    Returns the start and end indexes for a given page and page size.
+    Return the start and end indexes for a given page and page size.
     """
     start = (page - 1) * page_size
     end = start + page_size
@@ -27,7 +28,7 @@ class Server:
 
     def dataset(self) -> List[List]:
         """
-        Returns the dataset, loading it from the CSV file.
+        Return the dataset, loading it from the CSV file if not already cached.
         """
         if self.__dataset is None:
             with open(self.DATA_FILE) as f:
@@ -37,11 +38,11 @@ class Server:
 
     def get_page(self, page: int = 1, page_size: int = 10) -> List[List]:
         """
-        Retrieves a page of data based on page number and page size.
+        Retrieve a page of data based on page number and page size.
 
         Returns:
-            A list of lists containing the requested page data.
-            If the page is out of range, an empty list is returned.
+            A list of lists containing the requested page data. If the page is
+            out of range, an empty list is returned.
         """
         assert isinstance(page, int) and isinstance(page_size, int), (
             "page and page_size must be integers."
@@ -58,3 +59,23 @@ class Server:
             return []
 
         return data[start:end]
+
+    def get_hyper(self, page: int = 1, page_size: int = 10) -> Dict:
+        """
+        Retrieve a dictionary with pagination details.
+
+        Returns:
+            A dictionary with page size, current page, dataset page,
+            next and previous page numbers, and total pages.
+        """
+        data = self.get_page(page, page_size)
+        total_pages = math.ceil(len(self.dataset()) / page_size)
+        
+        return {
+            "page_size": len(data),
+            "page": page,
+            "data": data,
+            "next_page": page + 1 if page < total_pages else None,
+            "prev_page": page - 1 if page > 1 else None,
+            "total_pages": total_pages,
+        }
