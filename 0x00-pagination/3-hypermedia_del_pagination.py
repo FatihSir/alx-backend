@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
 """
-Task 1: Simple pagination with a server class for managing baby names data.
+Deletion-resilient hypermedia pagination.
 """
 
 import csv
-from typing import List, Tuple
-
-
-def index_range(page: int, page_size: int) -> Tuple[int, int]:
-    """Return start and end indexes for a given page and page size."""
-    start = (page - 1) * page_size
-    end = start + page_size
-    return start, end
+from typing import List, Dict
 
 
 class Server:
-    """Server class to handle pagination of a popular baby names dataset."""
+    """Server class to paginate a database of popular baby names."""
     DATA_FILE = "Popular_Baby_Names.csv"
 
     def __init__(self):
         self.__dataset = None
+        self.__indexed_dataset = None
 
     def dataset(self) -> List[List]:
         """
@@ -31,26 +25,46 @@ class Server:
                 self.__dataset = [row for row in reader][1:]  # Skip header
         return self.__dataset
 
-    def get_page(self, page: int = 1, page_size: int = 10) -> List[List]:
+    def indexed_dataset(self) -> Dict[int, List]:
         """
-        Retrieve a page of data based on page number and page size.
+        Create a dictionary where keys are the original
+        indices and values are dataset rows.
+        """
+        if self.__indexed_dataset is None:
+            dataset = self.dataset()
+            self.__indexed_dataset =\
+                {i: dataset[i] for i in range(len(dataset))}
+        return self.__indexed_dataset
+
+    def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
+        """
+        Retrieve a deletion-resilient page of the dataset
+        based on index and page_size.
+
+        Args:
+            index (int): The start index for the page.
+            page_size (int): The number of items to include in the page.
 
         Returns:
-            A list of lists containing the requested page data. If the page is
-            out of range, an empty list is returned.
+            dict: A dictionary with pagination details.
         """
-        assert isinstance(page, int) and isinstance(page_size, int), (
-            "page and page_size must be integers."
-        )
-        assert page > 0 and page_size > 0, (
-            "page and page_size must be greater than 0."
-        )
+        # Ensure the provided index is within the bounds of the indexed dataset
+        assert 0 <= index < len(self.indexed_dataset()), "Index out of range."
 
-        start, end = index_range(page, page_size)
-        data = self.dataset()
+        data = []
+        next_index = index
 
-        # Return an empty list if the start index is beyond dataset length
-        if start >= len(data):
-            return []
+        for _ in range(page_size):
+            while next_index not in self.__indexed_dataset and\
+                    next_index < len(self.__indexed_dataset):
+                next_index += 1
+            if next_index < len(self.__indexed_dataset):
+                data.append(self.__indexed_dataset[next_index])
+                next_index += 1
 
-        return data[start:end]
+        return {
+            "index": index,
+            "data": data,
+            "page_size": len(data),
+            "next_index": next_index,
+        }
